@@ -13,6 +13,8 @@ const cloudinaryConfig = {
   apiSecret: process.env.REACT_APP_CLOUDINARY_API_SECRET,
 };
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 const Upload = () => {
   const [selectedPage, setSelectedPage] = useState("Events");
   const [formData, setFormData] = useState({
@@ -45,12 +47,22 @@ const Upload = () => {
     ],
   };
 
-  // Initialize Local Storage
+  // Initialize Events from API
   useEffect(() => {
-    const storedEvents = JSON.parse(localStorage.getItem("events")) || [];
-    const storedNews = JSON.parse(localStorage.getItem("news")) || [];
-    const storedBlogs = JSON.parse(localStorage.getItem("blogs")) || [];
-    setDataStore({ events: storedEvents, news: storedNews, blogs: storedBlogs });
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/events`);
+        setDataStore(prev => ({ ...prev, events: response.data }));
+      } catch (error) {
+        console.error('Error fetching events:', error);
+        setNotification({
+          message: "Error loading events",
+          type: "error"
+        });
+      }
+    };
+
+    fetchData();
   }, []);
 
   // Reset Form Data
@@ -84,7 +96,7 @@ const Upload = () => {
         const formData = new FormData();
         formData.append("file", file);
 
-        const response = await axios.post("http://localhost:5000/api/upload", formData, {
+        const response = await axios.post(`${API_URL}/api/upload`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
@@ -124,55 +136,52 @@ const Upload = () => {
   };
 
   // Form Submission Handler
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const storeKey = selectedPage.toLowerCase();
-    const requiredFields =
-      storeKey === "events"
-        ? ["name", "description", "date"]
-        : ["title", "category", "content", "date"];
+    
+    try {
+      const formattedData = {
+        ...formData,
+        date: new Date(formData.date).toISOString(),
+        images: formData.images || []
+      };
 
-    // Validate Required Fields
-    const isValid = requiredFields.every((field) => formData[field]);
-    if (!isValid) {
+      let response;
+      if (formData.id) {
+        // Update existing event
+        response = await axios.put(`${API_URL}/api/events/${formData.id}`, formattedData);
+      } else {
+        // Create new event
+        response = await axios.post(`${API_URL}/api/events`, formattedData);
+      }
+
+      // Update local state
+      const updatedEvents = formData.id
+        ? dataStore.events.map(event => 
+            event.id === formData.id ? response.data : event
+          )
+        : [response.data, ...dataStore.events];
+
+      setDataStore(prev => ({
+        ...prev,
+        events: updatedEvents
+      }));
+
       setNotification({
-        message: "Please fill all required fields",
-        type: "error",
+        message: formData.id
+          ? "Event updated successfully"
+          : "Event created successfully",
+        type: "success"
       });
-      setTimeout(() => setNotification(null), 3000);
-      return;
+
+      resetFormData();
+    } catch (error) {
+      console.error('Error saving event:', error);
+      setNotification({
+        message: "Error saving event",
+        type: "error"
+      });
     }
-
-    // Prepare Data for Saving
-    const parsedDate = new Date(formData.date).toISOString();
-    const updatedFormData = { 
-      ...formData, 
-      date: parsedDate,
-      images: formData.images || [] // Ensure images array exists
-    };
-
-    // Save Data
-    const updatedData = formData.id
-      ? dataStore[storeKey].map((item) =>
-          item.id === formData.id ? { ...item, ...updatedFormData } : item
-        )
-      : [{ ...updatedFormData, id: Date.now() }, ...dataStore[storeKey]];
-
-    // Update State and LocalStorage
-    const newDataStore = { ...dataStore, [storeKey]: updatedData };
-    setDataStore(newDataStore);
-    localStorage.setItem(storeKey, JSON.stringify(updatedData));
-
-    // Show Notification
-    setNotification({
-      message: formData.id
-        ? `${selectedPage} updated successfully`
-        : `${selectedPage} created successfully`,
-      type: "success",
-    });
-    setTimeout(() => setNotification(null), 3000);
-
-    resetFormData();
   };
 
   // Edit an Item
@@ -187,19 +196,27 @@ const Upload = () => {
     }
   };
 
-  // Delete an Item
-  const handleDelete = (id) => {
-    const storeKey = selectedPage.toLowerCase();
-    const updatedData = dataStore[storeKey].filter((item) => item.id !== id);
-    const newDataStore = { ...dataStore, [storeKey]: updatedData };
-    setDataStore(newDataStore);
-    localStorage.setItem(storeKey, JSON.stringify(updatedData));
+  // Delete Handler
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`${API_URL}/api/events/${id}`);
+      
+      setDataStore(prev => ({
+        ...prev,
+        events: prev.events.filter(event => event.id !== id)
+      }));
 
-    setNotification({
-      message: `${selectedPage} deleted successfully`,
-      type: "success",
-    });
-    setTimeout(() => setNotification(null), 3000);
+      setNotification({
+        message: "Event deleted successfully",
+        type: "success"
+      });
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      setNotification({
+        message: "Error deleting event",
+        type: "error"
+      });
+    }
   };
 
   // Format Date

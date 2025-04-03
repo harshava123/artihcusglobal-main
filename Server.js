@@ -5,9 +5,34 @@ const cors = require("cors");
 const multer = require("multer");
 const crypto = require('crypto');
 const cloudinary = require('cloudinary').v2;
+const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const app = express();
-const port = 5000;
+const port = process.env.PORT || 3001; // Use Vercel's port or fallback to 3001
+
+// MongoDB Configuration
+const uri = process.env.MONGODB_URI;
+const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  }
+});
+
+// Connect to MongoDB
+async function connectToMongoDB() {
+  try {
+    await client.connect();
+    await client.db("admin").command({ ping: 1 });
+    console.log("Successfully connected to MongoDB!");
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
+    process.exit(1);
+  }
+}
+
+connectToMongoDB();
 
 // Configure Cloudinary
 cloudinary.config({
@@ -17,7 +42,11 @@ cloudinary.config({
 });
 
 // Middleware
-app.use(cors({ origin: "*", methods: ["GET", "POST"] })); // Customize allowed origins and methods
+app.use(cors({
+  origin: ['https://artihcusglobal-main.vercel.app', 'http://localhost:3000'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Multer setup for file uploads
@@ -184,6 +213,71 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
   } catch (error) {
     console.error("Upload error:", error);
     res.status(500).json({ error: "Failed to upload image" });
+  }
+});
+
+// Event endpoints
+app.post("/api/events", async (req, res) => {
+  try {
+    const db = client.db("artihcus");
+    const events = db.collection("events");
+    const result = await events.insertOne(req.body);
+    res.status(201).json({ ...req.body, _id: result.insertedId });
+  } catch (error) {
+    console.error("Error creating event:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/events", async (req, res) => {
+  try {
+    const db = client.db("artihcus");
+    const events = db.collection("events");
+    const result = await events.find().sort({ date: -1 }).toArray();
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching events:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put("/api/events/:id", async (req, res) => {
+  try {
+    const db = client.db("artihcus");
+    const events = db.collection("events");
+    const result = await events.findOneAndUpdate(
+      { _id: req.params.id },
+      { $set: req.body },
+      { returnDocument: 'after' }
+    );
+    res.json(result.value);
+  } catch (error) {
+    console.error("Error updating event:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/events/:id", async (req, res) => {
+  try {
+    const db = client.db("artihcus");
+    const events = db.collection("events");
+    await events.deleteOne({ _id: req.params.id });
+    res.json({ message: "Event deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting event:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  try {
+    await client.close();
+    console.log('MongoDB connection closed.');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error closing MongoDB connection:', error);
+    process.exit(1);
   }
 });
 
