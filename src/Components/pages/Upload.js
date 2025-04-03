@@ -218,6 +218,19 @@ const Upload = () => {
           <li key={item.id} className="p-4 bg-white rounded-lg shadow">
             <h4 className="font-bold text-lg">{item.title || item.name}</h4>
             <p className="text-sm text-gray-500">{formatDate(item.date)}</p>
+            {storeKey === "events" && item.images && item.images.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 my-4">
+                {item.images.map((image, index) => (
+                  <div key={index} className="relative">
+                    <img
+                      src={image}
+                      alt={`Event image ${index + 1}`}
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
             <div
               className="text-sm mt-2"
               dangerouslySetInnerHTML={{
