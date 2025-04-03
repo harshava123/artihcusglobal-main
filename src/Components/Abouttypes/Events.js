@@ -9,17 +9,29 @@ const Events = () => {
   const [selectedImageIndex, setSelectedImageIndex] = useState(null);
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [likes, setLikes] = useState({});
-  const [autoSlide, setAutoSlide] = useState(false); // Auto slide is initially false
+  const [autoSlide, setAutoSlide] = useState(false);
  
   useEffect(() => {
     const loadEvents = () => {
       setLoading(true);
-      const storedEvents = localStorage.getItem('events');
-      const storedLikes = localStorage.getItem('eventLikes');
-      const parsedEvents = storedEvents ? JSON.parse(storedEvents) : [];
-      const parsedLikes = storedLikes ? JSON.parse(storedLikes) : {};
-      setEvents(parsedEvents.reverse());
-      setLikes(parsedLikes);
+      try {
+        const storedEvents = localStorage.getItem('events');
+        const storedLikes = localStorage.getItem('eventLikes');
+        const parsedEvents = storedEvents ? JSON.parse(storedEvents) : [];
+        const parsedLikes = storedLikes ? JSON.parse(storedLikes) : {};
+        
+        // Filter out events without images and ensure all events have an images array
+        const validEvents = parsedEvents.map(event => ({
+          ...event,
+          images: event.images || []
+        })).filter(event => event.images.length > 0);
+        
+        setEvents(validEvents.reverse());
+        setLikes(parsedLikes);
+      } catch (error) {
+        console.error('Error loading events:', error);
+        setEvents([]);
+      }
       setLoading(false);
     };
  
@@ -177,7 +189,7 @@ const Events = () => {
           >
             <ImageIcon className="mx-auto h-16 w-16 text-orange-500 mb-4" />
             <h3 className="text-2xl font-medium text-gray-900 mb-2">No events yet</h3>
-            <p className="text-gray-500">Events will appear here once uploaded.</p>
+            <p className="text-gray-500">Events will appear here once uploaded with images.</p>
           </motion.div>
         ) : (
           <motion.div
@@ -196,13 +208,19 @@ const Events = () => {
               >
                 <div className="cursor-pointer" onClick={() => toggleEvent(event.id)}>
                   <div className="relative h-56 overflow-hidden">
-                    <motion.img
-                      src={event.images[0]}
-                      alt={event.name}
-                      className="w-full h-full object-contain"
-                      whileHover={{ scale: 1.1 }}
-                      transition={{ duration: 0.3 }}
-                    />
+                    {event.images && event.images[0] ? (
+                      <motion.img
+                        src={event.images[0]}
+                        alt={event.name}
+                        className="w-full h-full object-cover"
+                        whileHover={{ scale: 1.1 }}
+                        transition={{ duration: 0.3 }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                        <ImageIcon className="h-12 w-12 text-gray-400" />
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     <motion.div
                       className="absolute bottom-4 right-4 bg-white rounded-full p-2"
@@ -226,7 +244,13 @@ const Events = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center text-gray-500">
                         <Calendar className="h-4 w-4 mr-2" />
-                        <span className="text-sm">{event.date}</span>
+                        <span className="text-sm">
+                          {new Date(event.date).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </span>
                       </div>
                       <motion.button
                         whileHover={{ scale: 1.1 }}
@@ -244,26 +268,28 @@ const Events = () => {
                 </div>
  
                 <AnimatePresence>
-                  {expandedEvent === event.id && (
+                  {expandedEvent === event.id && event.images && event.images.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
+                      className="p-6 pt-0"
                     >
-                      <div className="grid grid-cols-3 gap-4 p-6">
+                      <div className="grid grid-cols-3 gap-2">
                         {event.images.map((image, index) => (
-                          <div
+                          <motion.div
                             key={index}
-                            className="cursor-pointer"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="relative aspect-square cursor-pointer overflow-hidden rounded-lg"
                             onClick={() => openLightbox(event.id, index)}
                           >
                             <img
                               src={image}
-                              alt={`Event ${index}`}
-                              className="w-full h-32 object-contain rounded-md"
+                              alt={`${event.name} ${index + 1}`}
+                              className="w-full h-full object-cover"
                             />
-                          </div>
+                          </motion.div>
                         ))}
                       </div>
                     </motion.div>
@@ -274,16 +300,18 @@ const Events = () => {
           </motion.div>
         )}
       </motion.div>
- 
-      {selectedImageIndex !== null && selectedEventId !== null && (
-        <ImageSlider
-          images={events.find(e => e.id === selectedEventId).images}
-          currentIndex={selectedImageIndex}
-          onClose={closeLightbox}
-        />
-      )}
+
+      <AnimatePresence>
+        {selectedImageIndex !== null && selectedEventId !== null && (
+          <ImageSlider
+            images={events.find(e => e.id === selectedEventId)?.images || []}
+            currentIndex={selectedImageIndex}
+            onClose={closeLightbox}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
- 
+
 export default Events;

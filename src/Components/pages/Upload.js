@@ -146,7 +146,11 @@ const Upload = () => {
 
     // Prepare Data for Saving
     const parsedDate = new Date(formData.date).toISOString();
-    const updatedFormData = { ...formData, date: parsedDate };
+    const updatedFormData = { 
+      ...formData, 
+      date: parsedDate,
+      images: formData.images || [] // Ensure images array exists
+    };
 
     // Save Data
     const updatedData = formData.id
