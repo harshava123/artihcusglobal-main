@@ -80,27 +80,17 @@ const Upload = () => {
 
     setUploading(true);
     try {
-      const timestamp = Math.round(new Date().getTime() / 1000);
-      
-      // Get signature from backend
-      const signatureResponse = await axios.post(`${BACKEND_URL}/api/cloudinary-signature`, {
-        timestamp: timestamp
-      });
-      
       const uploadPromises = files.map(async (file) => {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("api_key", "273915118852482"); // Your Cloudinary API key
-        formData.append("timestamp", timestamp);
-        formData.append("signature", signatureResponse.data.signature);
-        formData.append("folder", "events"); // Store images in an 'events' folder
 
-        const response = await axios.post(
-          `https://api.cloudinary.com/v1_1/dnkoylvko/image/upload`,
-          formData
-        );
+        const response = await axios.post("http://localhost:5000/api/upload", formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
 
-        return response.data.secure_url;
+        return response.data.url;
       });
 
       const imageUrls = await Promise.all(uploadPromises);

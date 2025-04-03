@@ -11,8 +11,8 @@ const port = 5000;
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.REACT_APP_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.REACT_APP_CLOUDINARY_API_KEY,
+  cloud_name: "dnkoylvko",
+  api_key: "273915118852482",
   api_secret: process.env.REACT_APP_CLOUDINARY_API_SECRET
 });
 
@@ -24,7 +24,7 @@ app.use(express.json());
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
 // Create a Nodemailer transport
@@ -160,6 +160,30 @@ app.post("/api/cloudinary-signature", (req, res) => {
   } catch (error) {
     console.error('Error generating signature:', error);
     res.status(500).json({ error: 'Failed to generate signature' });
+  }
+});
+
+// Upload image endpoint
+app.post("/api/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    // Convert buffer to base64
+    const b64 = Buffer.from(req.file.buffer).toString("base64");
+    const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(dataURI, {
+      folder: "events",
+      resource_type: "auto"
+    });
+
+    res.json({ url: result.secure_url });
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ error: "Failed to upload image" });
   }
 });
 
