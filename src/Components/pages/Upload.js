@@ -3,6 +3,9 @@ import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import axios from "axios";
 
+// Backend URL
+const BACKEND_URL = "http://localhost:5000";
+
 // Cloudinary configuration
 const cloudinaryConfig = {
   cloudName: process.env.REACT_APP_CLOUDINARY_CLOUD_NAME,
@@ -77,22 +80,23 @@ const Upload = () => {
 
     setUploading(true);
     try {
+      const timestamp = Math.round(new Date().getTime() / 1000);
+      
+      // Get signature from backend
+      const signatureResponse = await axios.post(`${BACKEND_URL}/api/cloudinary-signature`, {
+        timestamp: timestamp
+      });
+      
       const uploadPromises = files.map(async (file) => {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("api_key", cloudinaryConfig.apiKey);
-        formData.append("timestamp", Math.round(new Date().getTime() / 1000));
-        
-        // Generate signature
-        const signature = await axios.post("/api/cloudinary-signature", {
-          timestamp: Math.round(new Date().getTime() / 1000),
-          apiKey: cloudinaryConfig.apiKey,
-        });
-        
-        formData.append("signature", signature.data.signature);
+        formData.append("api_key", "273915118852482"); // Your Cloudinary API key
+        formData.append("timestamp", timestamp);
+        formData.append("signature", signatureResponse.data.signature);
+        formData.append("folder", "events"); // Store images in an 'events' folder
 
         const response = await axios.post(
-          `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`,
+          `https://api.cloudinary.com/v1_1/dnkoylvko/image/upload`,
           formData
         );
 
@@ -104,15 +108,20 @@ const Upload = () => {
         ...prev,
         images: [...prev.images, ...imageUrls],
       }));
+
+      setNotification({
+        message: "Images uploaded successfully!",
+        type: "success",
+      });
     } catch (error) {
       console.error("Error uploading images:", error);
       setNotification({
         message: "Error uploading images. Please try again.",
         type: "error",
       });
-      setTimeout(() => setNotification(null), 3000);
     } finally {
       setUploading(false);
+      setTimeout(() => setNotification(null), 3000);
     }
   };
 

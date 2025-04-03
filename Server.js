@@ -4,9 +4,17 @@ const nodemailer = require("nodemailer");
 const cors = require("cors");
 const multer = require("multer");
 const crypto = require('crypto');
+const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const port = 5000;
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.REACT_APP_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.REACT_APP_CLOUDINARY_API_KEY,
+  api_secret: process.env.REACT_APP_CLOUDINARY_API_SECRET
+});
 
 // Middleware
 app.use(cors({ origin: "*", methods: ["GET", "POST"] })); // Customize allowed origins and methods
@@ -139,17 +147,20 @@ app.post("/send-email/contacthome", async (req, res) => {
 
 // Cloudinary signature endpoint
 app.post("/api/cloudinary-signature", (req, res) => {
-  const { timestamp, apiKey } = req.body;
-  const apiSecret = process.env.REACT_APP_CLOUDINARY_API_SECRET;
-
-  // Generate signature
-  const str = `timestamp=${timestamp}&api_key=${apiKey}${apiSecret}`;
-  const signature = crypto
-    .createHash('sha1')
-    .update(str)
-    .digest('hex');
-
-  res.json({ signature });
+  try {
+    const { timestamp } = req.body;
+    
+    // Generate signature
+    const signature = cloudinary.utils.api_sign_request(
+      { timestamp: timestamp },
+      process.env.REACT_APP_CLOUDINARY_API_SECRET
+    );
+    
+    res.json({ signature });
+  } catch (error) {
+    console.error('Error generating signature:', error);
+    res.status(500).json({ error: 'Failed to generate signature' });
+  }
 });
 
 // Start the server
